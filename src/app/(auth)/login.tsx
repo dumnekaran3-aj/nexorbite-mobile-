@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { View, Text } from "react-native";
 import { Link } from "expo-router";
 import Button from "@/components/ui/Button";
@@ -18,7 +18,10 @@ export default function LoginScreen() {
     try {
       await login(email, password);
     } catch (err: any) {
-      setError(err.response?.data?.msg || "Login failed. Check your credentials.");
+       console.log("LOGIN ERROR:", JSON.stringify(err, null, 2));
+  console.log("ERROR MESSAGE:", err.message);
+  console.log("ERROR RESPONSE:", err.response?.data);
+      setError(err.response?.data?.message || err.response?.data?.msg || "Login failed. Check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -43,9 +46,9 @@ export default function LoginScreen() {
         <Button title="Log In" onPress={handleLogin} loading={loading} />
       </View>
 
-     <Link href={"/(auth)/register" as any} className="text-brand-300 text-center mt-6">
-  you dont have an account ? Register
-</Link>
+      <Link href="/(auth)/register" className="text-brand-300 text-center mt-6">
+        Don't have an account? Register
+      </Link>
     </View>
   );
 }

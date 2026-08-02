@@ -1,42 +1,30 @@
-import { create } from "zustand";
-import * as SecureStore from "expo-secure-store";
+﻿import { create } from "zustand";
 import * as authService from "../services/authService";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import { Platform } from "react-native";
-
-
-
+import { storage } from "../utils/storage";
 
 interface AuthState {
   user: any | null;
   isLoading: boolean;
-
   isAuthenticated: boolean;
-
   login: (email: string, password: string) => Promise<void>;
-
-
-
+  register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-
   hydrate: () => Promise<void>;
+  setUser: (user: any) => void;
 }
 
-
-
 export const useAuthStore = create<AuthState>((set) => ({
-
   user: null,
-
   isLoading: true,
-
   isAuthenticated: false,
 
   login: async (email, password) => {
-
     const data = await authService.login(email, password);
+    set({ user: data.user, isAuthenticated: true });
+  },
 
+  register: async (username, email, password) => {
+    const data = await authService.register(username, email, password);
     set({ user: data.user, isAuthenticated: true });
   },
 
@@ -45,19 +33,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, isAuthenticated: false });
   },
 
-hydrate: async () => {
-  const token = await AsyncStorage.getItem("authToken");
-  set({ isAuthenticated: !!token, isLoading: false });
-},
+  hydrate: async () => {
+    try {
+      const token = await storage.getItem("authToken");
+      set({ isAuthenticated: !!token, isLoading: false });
+    } catch (error) {
+      console.error("Hydrate error:", error);
+      set({ isAuthenticated: false, isLoading: false });
+    }
+  },
+
+  setUser: (user) => set({ user }),
 }));
-
-
-
-const storage = {
-  getItem: (key: string) =>
-    Platform.OS === "web" ? Promise.resolve(null) : SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) =>
-    Platform.OS === "web" ? Promise.resolve() : SecureStore.setItemAsync(key, value),
-  deleteItem: (key: string) =>
-    Platform.OS === "web" ? Promise.resolve() : SecureStore.deleteItemAsync(key),
-};

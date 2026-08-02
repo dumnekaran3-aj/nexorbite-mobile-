@@ -20,7 +20,7 @@ export default function FeedPost({ post, onOpen }: FeedPostProps) {
 
   return (
     <View className="flex-row gap-3 px-3 py-4 border-b border-navy-700">
-      <Link href={seller._id ? `/(app)/friends/public-profile/${seller._id}` : "#"} asChild>
+      <Link href={seller._id ? `/(app)/friends/public-profile/${seller._id}` as any : "#"} asChild>
         <Pressable className="w-11 h-11 rounded-full bg-brand-600/30 items-center justify-center overflow-hidden border border-navy-600 mt-0.5">
           {hasAvatar ? (
             <Image source={{ uri: seller.avatar }} className="w-full h-full" onError={() => setAvatarError(true)} />

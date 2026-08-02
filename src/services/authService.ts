@@ -1,17 +1,18 @@
-import api from "./api";
-import * as SecureStore from "expo-secure-store";
+﻿import api from "./api";
+import { storage } from "../utils/storage";
 
 export const login = async (email: string, password: string) => {
-  const res = await api.post("/api/auth/login", { email, password });
-  if (res.data?.token) await SecureStore.setItemAsync("authToken", res.data.token);
-  return res.data;
+  const res = await api.post("/api/auth/signin", { email, password });
+  if (res.data?.token) await storage.setItem("authToken", res.data.token);
+  return res.data; // { token, user }
 };
 
-export const register = async (payload: any) => {
-  const res = await api.post("/api/auth/register", payload);
-  return res.data;
+export const register = async (username: string, email: string, password: string) => {
+  const res = await api.post("/api/auth/signup", { username, email, password });
+  if (res.data?.token) await storage.setItem("authToken", res.data.token);
+  return res.data; // { token, user }
 };
 
 export const logout = async () => {
-  await SecureStore.deleteItemAsync("authToken");
+  await storage.deleteItem("authToken");
 };

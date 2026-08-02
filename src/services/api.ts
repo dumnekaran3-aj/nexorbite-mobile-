@@ -1,5 +1,5 @@
-import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+﻿import axios from "axios";
+import { storage } from "../utils/storage";
 import ENV from "../config/env";
 
 const api = axios.create({
@@ -7,19 +7,17 @@ const api = axios.create({
   timeout: 15000,
 });
 
-// Har request ke saath JWT automatically attach ho jaayega
 api.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync("authToken");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const token = await storage.getItem("authToken");
+  if (token) config.headers.Authorization = Bearer ;
   return config;
 });
 
-// 401 aane pe token clear — login screen redirect authStore se wire hoga
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync("authToken");
+      await storage.deleteItem("authToken");
     }
     return Promise.reject(error);
   }

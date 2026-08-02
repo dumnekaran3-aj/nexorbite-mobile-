@@ -1,13 +1,17 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import * as feedService from "@/services/feedService";
 import FeedPost from "@/components/feed/FeedPost";
 
+interface PostItem {
+  _id: string;
+  [key: string]: any;
+}
+
 export default function FeedScreen() {
   const router = useRouter();
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<PostItem[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -31,7 +35,7 @@ export default function FeedScreen() {
 
   useEffect(() => {
     loadFeed(1);
-  }, []);
+  }, [loadFeed]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -62,12 +66,23 @@ export default function FeedScreen() {
         data={posts}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
-          <FeedPost post={item} onOpen={() => router.push(\`/(app)/feed/\${item._id}\`)} />
+          <FeedPost
+            post={item}
+            onOpen={() => router.push(`/(app)/feed/${item._id}` as any)}
+          />
         )}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8478bb" />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#8478bb"
+          />
+        }
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.4}
-        ListFooterComponent={loadingMore ? <ActivityIndicator className="my-4" color="#8478bb" /> : null}
+        ListFooterComponent={
+          loadingMore ? <ActivityIndicator className="my-4" color="#8478bb" /> : null
+        }
         ListEmptyComponent={
           <View className="items-center justify-center py-20">
             <Text className="text-navy-400">No posts yet in your college feed.</Text>

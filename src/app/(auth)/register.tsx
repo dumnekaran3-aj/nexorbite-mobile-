@@ -1,25 +1,25 @@
 ﻿import { useState } from "react";
-import { View, Text, ScrollView } from "react-native";
+import { View, Text } from "react-native";
 import { Link, useRouter } from "expo-router";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import * as authService from "@/services/authService";
+import { useAuthStore } from "@/store/authStore";
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const register = useAuthStore((s) => s.register);
 
   const handleRegister = async () => {
     setError("");
     setLoading(true);
     try {
-      await authService.register({ fullName, username, email, password });
-      router.replace("/(auth)/login");
+      await register(username, email, password);
+      router.replace("/(auth)/profile-setup");
     } catch (err: any) {
       setError(err.response?.data?.msg || "Registration failed.");
     } finally {
@@ -28,7 +28,7 @@ export default function RegisterScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-navy-900" contentContainerClassName="px-6 py-16">
+    <View className="flex-1 bg-navy-900 justify-center px-6">
       <View className="items-center mb-10">
         <View className="w-16 h-16 rounded-2xl bg-navy-700 items-center justify-center mb-4">
           <Text className="text-brand-400 text-3xl font-bold">Σ</Text>
@@ -38,7 +38,6 @@ export default function RegisterScreen() {
       </View>
 
       <View className="gap-3">
-        <Input placeholder="Full Name" value={fullName} onChangeText={setFullName} />
         <Input placeholder="Username" value={username} onChangeText={setUsername} autoCapitalize="none" />
         <Input placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
         <Input placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
@@ -51,6 +50,6 @@ export default function RegisterScreen() {
       <Link href="/(auth)/login" className="text-brand-300 text-center mt-6">
         Already have an account? Log in
       </Link>
-    </ScrollView>
+    </View>
   );
 }
