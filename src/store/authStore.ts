@@ -11,19 +11,32 @@ import { Platform } from "react-native";
 interface AuthState {
   user: any | null;
   isLoading: boolean;
+
   isAuthenticated: boolean;
+
   login: (email: string, password: string) => Promise<void>;
+
+
+
   logout: () => Promise<void>;
+
   hydrate: () => Promise<void>;
 }
 
+
+
 export const useAuthStore = create<AuthState>((set) => ({
+
   user: null,
+
   isLoading: true,
+
   isAuthenticated: false,
 
   login: async (email, password) => {
+
     const data = await authService.login(email, password);
+
     set({ user: data.user, isAuthenticated: true });
   },
 
