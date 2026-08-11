@@ -1,15 +1,21 @@
 ﻿import axios from "axios";
 import { storage } from "../utils/storage";
-import ENV from "../config/env";
+
+// Direct hardcoded for local testing
+const LOCAL_API_URL = "http://localhost:3000";
+
+console.log("🚀 FORCE LOCAL API URL:", LOCAL_API_URL);
 
 const api = axios.create({
-  baseURL: ENV.API_URL,
+  baseURL: LOCAL_API_URL,
   timeout: 15000,
 });
 
 api.interceptors.request.use(async (config) => {
   const token = await storage.getItem("authToken");
-  if (token) config.headers.Authorization = Bearer ;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 

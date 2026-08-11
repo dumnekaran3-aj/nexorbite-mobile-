@@ -1,21 +1,40 @@
-import { Stack } from "expo-router";
+﻿import { useEffect, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
+import { Stack, useRouter, useSegments } from "expo-router";
+import * as collegeService from "@/services/collegeService";
+import { useCollegeStore } from "@/store/collegeStore";
 
 export default function AppLayout() {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen
-        name="chat/[chatId]"
-        options={{ headerShown: true, headerStyle: { backgroundColor: "#12172a" }, headerTintColor: "#fff" }}
-      />
-      <Stack.Screen
-        name="groups/[groupId]"
-        options={{ headerShown: true, headerStyle: { backgroundColor: "#12172a" }, headerTintColor: "#fff" }}
-      />
-      <Stack.Screen
-        name="friends/public-profile/[userId]"
-        options={{ headerShown: true, headerStyle: { backgroundColor: "#12172a" }, headerTintColor: "#fff" }}
-      />
-    </Stack>
-  );
+  const router = useRouter();
+  const segments = useSegments();
+  const { isJoined, setCollegeStatus } = useCollegeStore();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    collegeService
+      .getCollegeStatus()
+      .then((res) => {
+        setCollegeStatus(res.collegeStatus);
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, []);
+
+  useEffect(() => {
+    if (checking) return;
+    const onGateScreen = segments[segments.length - 1] === "join-college";
+    if (!isJoined && !onGateScreen) {
+      router.replace("/(app)/join-college");
+    }
+  }, [checking, isJoined, segments]);
+
+  if (checking) {
+    return (
+      <View className="flex-1 bg-navy-900 items-center justify-center">
+        <ActivityIndicator color="#8478bb" />
+      </View>
+    );
+  }
+
+  return <Stack screenOptions={{ headerShown: false }} />;
 }

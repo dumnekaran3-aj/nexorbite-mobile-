@@ -1,12 +1,9 @@
+﻿// Hardcode for testing local connection
 const ENV = {
-  development: {
-    API_URL: "https://backend-2xiu.onrender.com",
-    SOCKET_URL: "https://backend-2xiu.onrender.com",
-  },
-  production: {
-    API_URL: "https://backend-2xiu.onrender.com",
-    SOCKET_URL: "https://backend-2xiu.onrender.com",
-  },
+  API_URL: "http://localhost:3000",
+  SOCKET_URL: "http://localhost:3000",
 };
 
-export default __DEV__ ? ENV.development : ENV.production;
+console.log("CURRENT API URL:", ENV.API_URL);
+
+export default ENV;

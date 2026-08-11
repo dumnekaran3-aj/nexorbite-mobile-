@@ -16,10 +16,14 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     setError("");
+    if (!username.trim() || !email.trim() || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
     setLoading(true);
     try {
-      await register(username, email, password);
-      router.replace("/(auth)/profile-setup");
+      await register(username.trim(), email.trim(), password);
+      router.replace({ pathname: "/(auth)/verify-otp", params: { email: email.trim() } });
     } catch (err: any) {
       setError(err.response?.data?.msg || "Registration failed.");
     } finally {
@@ -34,7 +38,7 @@ export default function RegisterScreen() {
           <Text className="text-brand-400 text-3xl font-bold">Σ</Text>
         </View>
         <Text className="text-white text-2xl font-bold tracking-tight">Create Account</Text>
-        <Text className="text-navy-400 mt-1">Join NexOrbite</Text>
+        <Text className="text-navy-400 mt-1 text-center">A verification code will be sent to your email</Text>
       </View>
 
       <View className="gap-3">
@@ -44,7 +48,7 @@ export default function RegisterScreen() {
 
         {!!error && <Text className="text-red-400 text-sm">{error}</Text>}
 
-        <Button title="Register" onPress={handleRegister} loading={loading} />
+        <Button title="Continue" onPress={handleRegister} loading={loading} />
       </View>
 
       <Link href="/(auth)/login" className="text-brand-300 text-center mt-6">

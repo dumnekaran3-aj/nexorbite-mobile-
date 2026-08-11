@@ -1,31 +1,29 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import * as feedService from "@/services/feedService";
 import FeedPost from "@/components/feed/FeedPost";
 
-interface PostItem {
-  _id: string;
-  [key: string]: any;
-}
-
 export default function FeedScreen() {
   const router = useRouter();
-  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const loadFeed = useCallback(async (pageNum: number, isRefresh = false) => {
+  const loadFeed = useCallback(async (pageNum: number) => {
     try {
       const data = await feedService.getCommunityFeed(pageNum, 20);
       setPosts((prev) => (pageNum === 1 ? data.posts : [...prev, ...data.posts]));
       setHasMore(pageNum < data.pagination.pages);
       setPage(pageNum);
-    } catch (err) {
-      console.error("Feed fetch error:", err);
+      setErrorMsg("");
+    } catch (err: any) {
+      setHasMore(false);
+      setErrorMsg(err.response?.data?.msg || "Couldn't load feed right now.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -35,15 +33,16 @@ export default function FeedScreen() {
 
   useEffect(() => {
     loadFeed(1);
-  }, [loadFeed]);
+  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadFeed(1, true);
+    setHasMore(true);
+    loadFeed(1);
   };
 
   const onLoadMore = () => {
-    if (!hasMore || loadingMore) return;
+    if (!hasMore || loadingMore || loading) return;
     setLoadingMore(true);
     loadFeed(page + 1);
   };
@@ -66,26 +65,17 @@ export default function FeedScreen() {
         data={posts}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
-          <FeedPost
-            post={item}
-            onOpen={() => router.push(`/(app)/feed/${item._id}` as any)}
-          />
+          <FeedPost post={item} onOpen={() => router.push(`/(app)/feed/${item._id}`)} />
         )}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#8478bb"
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8478bb" />}
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.4}
-        ListFooterComponent={
-          loadingMore ? <ActivityIndicator className="my-4" color="#8478bb" /> : null
-        }
+        ListFooterComponent={loadingMore ? <ActivityIndicator className="my-4" color="#8478bb" /> : null}
         ListEmptyComponent={
-          <View className="items-center justify-center py-20">
-            <Text className="text-navy-400">No posts yet in your college feed.</Text>
+          <View className="items-center justify-center py-20 px-6">
+            <Text className="text-navy-400 text-center">
+              {errorMsg || "No posts yet in your college feed."}
+            </Text>
           </View>
         }
       />

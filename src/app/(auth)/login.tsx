@@ -1,11 +1,12 @@
 ﻿import { useState } from "react";
 import { View, Text } from "react-native";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useAuthStore } from "@/store/authStore";
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,14 +15,19 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     setError("");
+    if (!email.trim() || !password) {
+      setError("Please enter your email and password.");
+      return;
+    }
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email.trim(), password);
     } catch (err: any) {
-       console.log("LOGIN ERROR:", JSON.stringify(err, null, 2));
-  console.log("ERROR MESSAGE:", err.message);
-  console.log("ERROR RESPONSE:", err.response?.data);
-      setError(err.response?.data?.message || err.response?.data?.msg || "Login failed. Check your credentials.");
+      if (err.response?.data?.needsVerification) {
+        router.push({ pathname: "/(auth)/verify-otp", params: { email: email.trim() } });
+        return;
+      }
+      setError(err.response?.data?.message || "Login failed. Check your credentials.");
     } finally {
       setLoading(false);
     }

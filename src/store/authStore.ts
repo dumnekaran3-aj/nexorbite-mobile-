@@ -6,8 +6,9 @@ interface AuthState {
   user: any | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ needsVerification?: boolean }>;
   register: (username: string, email: string, password: string) => Promise<void>;
+  verifyEmail: (email: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   setUser: (user: any) => void;
@@ -21,10 +22,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email, password) => {
     const data = await authService.login(email, password);
     set({ user: data.user, isAuthenticated: true });
+    return {};
   },
 
   register: async (username, email, password) => {
-    const data = await authService.register(username, email, password);
+    await authService.register(username, email, password);
+    // No auth state change yet — user must verify email first.
+  },
+
+  verifyEmail: async (email, otp) => {
+    const data = await authService.verifyEmail(email, otp);
     set({ user: data.user, isAuthenticated: true });
   },
 
