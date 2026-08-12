@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { GraduationCap, UserPlus, Check, X } from "lucide-react-native";
 import * as friendsService from "@/services/friendsService";
 import * as membersService from "@/services/membersService";
+import { useFriendsStore } from "@/store/friendsStore";
 
 type Segment = "friends" | "requests" | "find";
 
@@ -39,6 +40,7 @@ export default function FriendsScreen() {
       ]);
       setFriends(friendsRes.friends || []);
       setIncoming(incomingRes.requests || []);
+      useFriendsStore.getState().setIncomingCount((incomingRes.requests || []).length);
       setSuggestions(suggestRes.students || []);
     } catch (err) {
       console.error("Friends load error:", err);

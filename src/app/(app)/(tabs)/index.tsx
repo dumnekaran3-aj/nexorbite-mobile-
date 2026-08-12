@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from "react";
-import { View, Text, FlatList, RefreshControl, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, RefreshControl, ActivityIndicator, Pressable } from "react-native";
 import { useRouter } from "expo-router";
+import { Plus } from "lucide-react-native";
 import * as feedService from "@/services/feedService";
 import FeedPost from "@/components/feed/FeedPost";
 
@@ -59,13 +60,27 @@ export default function FeedScreen() {
     <View className="flex-1 bg-navy-900">
       <View className="px-4 pt-14 pb-3 border-b border-navy-700">
         <Text className="text-white text-xl font-bold tracking-tight">Feed</Text>
+         <Pressable
+          onPress={() => router.push("/(app)/feed/create")}
+          className="w-9 h-9 rounded-full bg-brand-500/15 border border-brand-500/40 items-center justify-center"
+        >
+          <Plus size={18} color="#8478bb" />
+        </Pressable>
       </View>
 
       <FlatList
         data={posts}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
-          <FeedPost post={item} onOpen={() => router.push(`/(app)/feed/${item._id}`)} />
+          <FeedPost
+  post={item}
+  onOpen={() =>
+    router.push({
+      pathname: "/(app)/feed/[postId]",
+      params: { postId: item._id, fallback: JSON.stringify(item) },
+    })
+  }
+/>
         )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8478bb" />}
         onEndReached={onLoadMore}

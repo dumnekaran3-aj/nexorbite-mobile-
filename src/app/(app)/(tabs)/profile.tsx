@@ -1,10 +1,11 @@
 ﻿import { useState, useEffect } from "react";
 import { View, Text, Image, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { LogOut, GraduationCap, Pencil, ChevronRight } from "lucide-react-native";
+import { LogOut, GraduationCap, Pencil, ChevronRight, Users } from "lucide-react-native";
 import { useAuthStore } from "@/store/authStore";
 import { useCollegeStore } from "@/store/collegeStore";
 import * as profileService from "@/services/profileService";
+
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -61,16 +62,16 @@ export default function ProfileScreen() {
       </View>
 
       <View className="px-4 mt-8 gap-2">
-        <Pressable
-          onPress={() => router.push("/(auth)/profile-setup")}
-          className="flex-row items-center justify-between bg-navy-800 border border-navy-600 rounded-2xl px-4 py-3.5"
-        >
-          <View className="flex-row items-center gap-3">
-            <Pencil size={16} color="#8478bb" />
-            <Text className="text-white text-sm font-medium">Edit Profile</Text>
-          </View>
-          <ChevronRight size={16} color="#4d5569" />
-        </Pressable>
+     <Pressable
+  onPress={() => router.push("/(app)/communities")}
+  className="flex-row items-center justify-between bg-navy-800 border border-navy-600 rounded-2xl px-4 py-3.5 mb-2"
+>
+  <View className="flex-row items-center gap-3">
+    <Users size={16} color="#8478bb" />
+    <Text className="text-white text-sm font-medium">Communities</Text>
+  </View>
+  <ChevronRight size={16} color="#4d5569" />
+</Pressable>
 
         <Pressable
           onPress={handleLogout}

@@ -1,32 +1,31 @@
+﻿import { getSocket } from "./socketClient";
+import { useToastStore } from "../store/toastStore";
+import { useFriendsStore } from "../store/friendsStore";
+import { useChatStore } from "../store/chatStore";
 
-import { getSocket } from "./socketClient";
-
-// Central registration — jab chatStore/friendsStore banega, inke andar store update calls aayenge
 export const registerSocketListeners = () => {
   const socket = getSocket();
   if (!socket) return;
 
-  socket.on("receive_message", (message) => {
-    // TODO: chatStore mein push karo
+  socket.off("receive_message");
+  socket.off("new_friend_request");
+  socket.off("chat_list_updated");
+  socket.off("you_are_blocked");
+
+  socket.on("receive_message", (message: any) => {
+    useChatStore.getState().handleIncomingMessage(message);
   });
 
-  socket.on("new_friend_request", (request) => {
-    // TODO: friendsStore mein push karo
+  socket.on("new_friend_request", (request: any) => {
+    useFriendsStore.getState().increment();
+    useToastStore.getState().show(`${request.from?.username || "Someone"} sent you a friend request`);
   });
 
-  socket.on("chat_list_updated", (data) => {
-    // TODO
+  socket.on("chat_list_updated", () => {
+    useChatStore.getState().loadChats();
   });
 
-  socket.on("you_are_blocked", (data) => {
-    // TODO
+  socket.on("you_are_blocked", () => {
+    useToastStore.getState().show("You've been blocked by this user.");
   });
 };
-
-export const ROLES = {
-  STUDENT: "student",
-  TEACHER: "teacher",
-  HOD: "hod",
-  PRINCIPAL: "principal",
-  OWNER: "owner",
-} as const;

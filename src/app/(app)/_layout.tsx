@@ -3,19 +3,23 @@ import { View, ActivityIndicator } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as collegeService from "@/services/collegeService";
 import { useCollegeStore } from "@/store/collegeStore";
+import { useAuthStore } from "@/store/authStore";
+import { connectSocket } from "@/sockets/socketClient";
+import { registerSocketListeners } from "@/sockets/socketListeners";
+import { useChatStore } from "@/store/chatStore";
+import Toast from "@/components/ui/Toast";
 
 export default function AppLayout() {
   const router = useRouter();
   const segments = useSegments();
-  const { isJoined, setCollegeStatus } = useCollegeStore();
+  const { isJoined, collegeId, setCollegeStatus } = useCollegeStore();
+  const user = useAuthStore((s) => s.user);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     collegeService
       .getCollegeStatus()
-      .then((res) => {
-        setCollegeStatus(res.collegeStatus);
-      })
+      .then((res) => setCollegeStatus(res.collegeStatus))
       .catch(() => {})
       .finally(() => setChecking(false));
   }, []);
@@ -28,6 +32,14 @@ export default function AppLayout() {
     }
   }, [checking, isJoined, segments]);
 
+  useEffect(() => {
+    if (!checking && isJoined && user?._id) {
+      connectSocket(user._id, collegeId || undefined);
+      registerSocketListeners();
+      useChatStore.getState().loadChats();
+    }
+  }, [checking, isJoined, user?._id, collegeId]);
+
   if (checking) {
     return (
       <View className="flex-1 bg-navy-900 items-center justify-center">
@@ -36,5 +48,10 @@ export default function AppLayout() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <View className="flex-1">
+      <Stack screenOptions={{ headerShown: false }} />
+      <Toast />
+    </View>
+  );
 }

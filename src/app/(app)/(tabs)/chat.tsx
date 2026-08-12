@@ -1,8 +1,9 @@
-﻿import { useState, useEffect, useCallback } from "react";
+﻿import { useEffect } from "react";
 import { View, Text, FlatList, Image, Pressable, ActivityIndicator, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 import { GraduationCap, MessageCircleOff } from "lucide-react-native";
-import * as chatService from "@/services/chatService";
+import { useChatStore } from "@/store/chatStore";
 
 function Avatar({ uri }: { uri?: string }) {
   return (
@@ -14,34 +15,17 @@ function Avatar({ uri }: { uri?: string }) {
 
 export default function ChatListScreen() {
   const router = useRouter();
-  const [chats, setChats] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadChats = useCallback(async () => {
-    try {
-      const data = await chatService.getMyChats();
-      setChats(data.chats || []);
-    } catch (err) {
-      console.error("Chat list error:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const chats = useChatStore((s) => s.chats);
+  const loading = useChatStore((s) => s.loading);
+  const loadChats = useChatStore((s) => s.loadChats);
 
   useFocusEffect(
     useCallback(() => {
       loadChats();
-    }, [loadChats])
+    }, [])
   );
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadChats();
-  };
-
-  if (loading) {
+  if (loading && chats.length === 0) {
     return (
       <View className="flex-1 bg-navy-900 items-center justify-center">
         <ActivityIndicator color="#8478bb" />
@@ -58,7 +42,7 @@ export default function ChatListScreen() {
       <FlatList
         data={chats}
         keyExtractor={(item) => item._id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8478bb" />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadChats} tintColor="#8478bb" />}
         renderItem={({ item }) => (
           <Pressable
             onPress={() =>
