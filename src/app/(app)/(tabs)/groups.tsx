@@ -1,12 +1,11 @@
 ﻿import { useState, useEffect, useCallback } from "react";
-import { View, Text, FlatList, Pressable, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, FlatList, Pressable, ActivityIndicator, RefreshControl, Image } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { Users, Plus, Lock } from "lucide-react-native";
+import { Users, Plus, Lock, Clock } from "lucide-react-native";
 import * as groupsService from "@/services/groupsService";
 import { useCollegeStore } from "@/store/collegeStore";
 
 type Segment = "all" | "mine";
-
 const CAN_CREATE_ROLES = ["teacher", "hod", "principal", "owner"];
 
 export default function GroupsScreen() {
@@ -19,7 +18,8 @@ export default function GroupsScreen() {
   const [myGroups, setMyGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -34,26 +34,24 @@ export default function GroupsScreen() {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = () => {
     setRefreshing(true);
     load();
   };
 
-  const handleJoin = async (groupId: string) => {
-    setJoiningId(groupId);
+  const handleRequestJoin = async (groupId: string) => {
+    setBusyId(groupId);
     try {
       await groupsService.joinGroup(groupId);
-      load();
-    } catch (err) {
-      console.error("Join group error:", err);
+      setRequestedIds((prev) => new Set(prev).add(groupId));
+    } catch (err: any) {
+      // "already pending" / "already a member" are fine to treat as requested
+      setRequestedIds((prev) => new Set(prev).add(groupId));
+      console.error("Join request error:", err?.response?.data?.msg || err);
     } finally {
-      setJoiningId(null);
+      setBusyId(null);
     }
   };
 
@@ -98,35 +96,51 @@ export default function GroupsScreen() {
         contentContainerClassName="px-4 py-3"
         renderItem={({ item }) => {
           const isMember = myGroupIds.has(item._id);
+          const isRequested = requestedIds.has(item._id);
           return (
             <Pressable
               onPress={() => router.push({ pathname: "/(app)/groups/[groupId]", params: { groupId: item._id } })}
-              className="bg-navy-800 border border-navy-600 rounded-2xl p-4 mb-3"
+              className="flex-row items-center gap-3 bg-navy-800 border border-navy-600 rounded-2xl p-3 mb-2.5"
             >
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1 pr-3">
-                  <Text className="text-white font-bold text-[15px]">{item.name}</Text>
-                  {!!item.description && (
-                    <Text className="text-navy-400 text-sm mt-1" numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  )}
-                  <View className="flex-row items-center gap-1.5 mt-2">
-                    <Users size={13} color="#4d5569" />
-                    <Text className="text-navy-400 text-xs">{item.memberDetails?.length || 0} members</Text>
-                    {item.isPrivate && <Lock size={12} color="#4d5569" className="ml-1" />}
-                  </View>
-                </View>
+              <View className="w-12 h-12 rounded-xl bg-brand-600/40 items-center justify-center overflow-hidden">
+                {item.avatar ? (
+                  <Image source={{ uri: item.avatar }} className="w-full h-full" />
+                ) : (
+                  <Text className="text-white font-extrabold text-lg">{item.name?.[0]?.toUpperCase() || "G"}</Text>
+                )}
+              </View>
 
+              <View className="flex-1 min-w-0">
+                <Text className="text-white font-semibold text-sm" numberOfLines={1}>{item.name}</Text>
+                <Text className="text-navy-400 text-xs mt-0.5" numberOfLines={1}>
+                  {item.description || `${item.memberDetails?.length || 0} members`}
+                </Text>
+              </View>
+
+              <View className="items-end gap-1">
+                <Text className="text-[10px] text-navy-400">
+                  {item.memberDetails?.length || 0}/{item.maxMembers || 500}
+                </Text>
                 {!isMember && (
                   <Pressable
-                    onPress={() => handleJoin(item._id)}
-                    disabled={joiningId === item._id}
-                    className="px-3 py-1.5 rounded-full bg-brand-500/15 border border-brand-500/40"
+                    onPress={() => handleRequestJoin(item._id)}
+                    disabled={busyId === item._id || isRequested}
+                    className={
+                      isRequested
+                        ? "flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-navy-700"
+                        : "px-2.5 py-1 rounded-full bg-brand-500/15 border border-brand-500/40"
+                    }
                   >
-                    <Text className="text-brand-300 text-xs font-semibold">
-                      {joiningId === item._id ? "..." : "Join"}
-                    </Text>
+                    {isRequested ? (
+                      <>
+                        <Clock size={10} color="#4d5569" />
+                        <Text className="text-navy-400 text-[10px] font-semibold">Requested</Text>
+                      </>
+                    ) : (
+                      <Text className="text-brand-300 text-[10px] font-semibold">
+                        {busyId === item._id ? "..." : "Ask to join"}
+                      </Text>
+                    )}
                   </Pressable>
                 )}
               </View>

@@ -1,11 +1,12 @@
 ﻿import { useState, useEffect, useCallback } from "react";
 import { View, Text, FlatList, Pressable, ActivityIndicator, RefreshControl } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { Users, Check } from "lucide-react-native";
 import * as collegeService from "@/services/collegeService";
 import * as communityService from "@/services/communityService";
 
 export default function CommunitiesScreen() {
+  const router = useRouter();
   const [myCommunities, setMyCommunities] = useState<{ privateCommunity: any; publicCommunities: any[] }>({
     privateCommunity: null,
     publicCommunities: [],
@@ -44,9 +45,21 @@ export default function CommunitiesScreen() {
   };
 
   const joinedIds = new Set([
-    myCommunities.privateCommunity?._id,
-    ...myCommunities.publicCommunities.map((c) => c._id),
+    myCommunities.privateCommunity?.collegeId,
+    ...myCommunities.publicCommunities.map((c) => c.collegeId),
   ]);
+
+  const openCommunity = (c: any) => {
+    router.push({
+      pathname: "/(app)/community/[collegeId]",
+      params: {
+        collegeId: c.collegeId,
+        name: c.name,
+        description: c.description || "",
+        memberCount: String(c.memberCount || 0),
+      },
+    });
+  };
 
   const handleJoin = async (community: any) => {
     setJoiningId(community._id);
@@ -88,20 +101,30 @@ export default function CommunitiesScreen() {
           <View className="mb-6">
             <Text className="text-navy-400 text-xs uppercase tracking-wide mb-2">Your Communities</Text>
             {myCommunities.privateCommunity && (
-              <View className="flex-row items-center gap-3 bg-navy-800 border border-brand-500/40 rounded-2xl px-4 py-3.5 mb-2">
+              <Pressable
+                onPress={() => openCommunity(myCommunities.privateCommunity)}
+                className="flex-row items-center gap-3 bg-navy-800 border border-brand-500/40 rounded-2xl px-4 py-3.5 mb-2"
+              >
                 <Users size={16} color="#8478bb" />
                 <View className="flex-1">
-                  <Text className="text-white font-semibold">{myCommunities.privateCommunity.college_name}</Text>
+                  <Text className="text-white font-semibold">{myCommunities.privateCommunity.name}</Text>
                   <Text className="text-navy-400 text-xs mt-0.5">Your main college</Text>
                 </View>
-              </View>
+              </Pressable>
             )}
             {myCommunities.publicCommunities.map((c) => (
-              <View key={c._id} className="flex-row items-center gap-3 bg-navy-800 border border-navy-600 rounded-2xl px-4 py-3.5 mb-2">
+              <Pressable
+                key={c.collegeId}
+                onPress={() => openCommunity(c)}
+                className="flex-row items-center gap-3 bg-navy-800 border border-navy-600 rounded-2xl px-4 py-3.5 mb-2"
+              >
                 <Users size={16} color="#4d5569" />
-                <Text className="text-white font-medium flex-1">{c.college_name}</Text>
-              </View>
+                <Text className="text-white font-medium flex-1">{c.name}</Text>
+              </Pressable>
             ))}
+            {!myCommunities.privateCommunity && myCommunities.publicCommunities.length === 0 && (
+              <Text className="text-navy-400 text-sm">You haven't joined any communities yet.</Text>
+            )}
 
             <Text className="text-navy-400 text-xs uppercase tracking-wide mt-4 mb-2">Discover</Text>
           </View>

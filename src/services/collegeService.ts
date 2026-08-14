@@ -11,7 +11,7 @@ export const createCollege = (payload: {
   formData.append("college_email", payload.college_email);
   formData.append("university", payload.university);
   formData.append("description", payload.description);
-  formData.append("isprivate", "true"); // this is the user's one identity community
+  formData.append("isprivate", "true");
   return api
     .post("/api/createcollege", formData, { headers: { "Content-Type": "multipart/form-data" } })
     .then((r) => r.data);
@@ -26,5 +26,8 @@ export const leaveCollege = (collegeId: string) =>
 export const getCollegeStatus = () => api.get("/api/createcollege/handler").then((r) => r.data);
 
 export const getMyCollege = () => api.get("/api/createcollege/my-college").then((r) => r.data);
+
+export const getCommunityInfo = (collegeId: string) =>
+  api.get("/api/createcollege/my-college", { params: { collegeId } }).then((r) => r.data);
 
 export const getMyCommunities = () => api.get("/api/createcollege/my-communities").then((r) => r.data);
