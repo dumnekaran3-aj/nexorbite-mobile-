@@ -27,8 +27,12 @@ export default function AppLayout() {
   useEffect(() => {
     if (checking) return;
     const onGateScreen = segments[segments.length - 1] === "join-college";
+
     if (!isJoined && !onGateScreen) {
       router.replace("/(app)/join-college");
+    } else if (isJoined && onGateScreen) {
+      // Already joined but somehow sitting on the gate screen — send them home.
+      router.replace("/(app)");
     }
   }, [checking, isJoined, segments]);
 

@@ -1,12 +1,13 @@
 ﻿import { useState } from "react";
 import { View, Text, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import * as groupsService from "@/services/groupsService";
 
 export default function CreateGroupScreen() {
   const router = useRouter();
+  const { collegeId } = useLocalSearchParams<{ collegeId?: string }>();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
@@ -20,7 +21,7 @@ export default function CreateGroupScreen() {
     }
     setLoading(true);
     try {
-      await groupsService.createGroup({ name: name.trim(), description: description.trim() });
+      await groupsService.createGroup({ name: name.trim(), description: description.trim() }, collegeId);
       router.back();
     } catch (err: any) {
       setError(err.response?.data?.msg || "Couldn't create group.");
