@@ -4,10 +4,12 @@ import { View, Text, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platf
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { Send, Info, Paperclip, FileText, Play, Download, MoreVertical, BellOff, Bell, Star } from "lucide-react-native";
+import { Send, Info, Paperclip, FileText, Play, Download, MoreVertical, BellOff, Star, X, CornerUpLeft } from "lucide-react-native";
 import * as groupsService from "@/services/groupsService";
 import { getSocket, connectSocket } from "@/sockets/socketClient";
 import { useAuthStore } from "@/store/authStore";
+
+const QUICK_EMOJIS = ["❤️", "😂", "👍", "😮", "😢", "🔥"];
 
 export default function GroupChatScreen() {
   const { groupId, groupName } = useLocalSearchParams<{ groupId: string; groupName?: string }>();
@@ -21,6 +23,7 @@ export default function GroupChatScreen() {
   const [permissionError, setPermissionError] = useState("");
   const [isMuted, setIsMuted] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<any>(null);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -43,11 +46,30 @@ export default function GroupChatScreen() {
 
     const socket = getSocket() || connectSocket(myId || "");
     socket.emit("join_room", { roomType: "group", roomId: groupId });
+
     const handleIncoming = (message: any) => {
       if (message.groupId === groupId) setMessages((prev) => [message, ...prev]);
     };
+    const handleReaction = ({ messageId, userId, emoji }: any) => {
+      setMessages((prev) => prev.map((m) => {
+        if (m._id !== messageId) return m;
+        const reactions = (m.reactions || []).filter((r: any) => r.userId !== userId);
+        reactions.push({ userId, emoji });
+        return { ...m, reactions };
+      }));
+    };
+    const handleReactionRemoved = ({ messageId, userId }: any) => {
+      setMessages((prev) => prev.map((m) => m._id === messageId ? { ...m, reactions: (m.reactions || []).filter((r: any) => r.userId !== userId) } : m));
+    };
+
     socket.on("receive_group_message", handleIncoming);
-    return () => { socket.off("receive_group_message", handleIncoming); };
+    socket.on("group_message_reaction", handleReaction);
+    socket.on("group_message_reaction_removed", handleReactionRemoved);
+    return () => {
+      socket.off("receive_group_message", handleIncoming);
+      socket.off("group_message_reaction", handleReaction);
+      socket.off("group_message_reaction_removed", handleReactionRemoved);
+    };
   }, [groupId]);
 
   const handleSend = async () => {
@@ -56,8 +78,10 @@ export default function GroupChatScreen() {
     setSending(true);
     setPermissionError("");
     setText("");
+    const replyId = replyingTo?._id;
+    setReplyingTo(null);
     try {
-      const data = await groupsService.sendGroupMessage(groupId, trimmed);
+      const data = await groupsService.sendGroupMessage(groupId, trimmed, replyId);
       setMessages((prev) => [data.message, ...prev]);
     } catch (err: any) {
       if (err.response?.status === 403) setPermissionError("Only group admins can send messages right now.");
@@ -112,19 +136,53 @@ export default function GroupChatScreen() {
     setIsMuted(next);
     try { await groupsService.toggleMuteGroup(groupId, next); } catch (err) { setIsMuted(!next); console.error(err); }
   };
-
   const toggleFavorite = async () => {
     const next = !isFavorite;
     setIsFavorite(next);
     try { await groupsService.toggleFavoriteGroup(groupId, next); } catch (err) { setIsFavorite(!next); console.error(err); }
   };
-
   const handleMenu = () => {
     Alert.alert("Group options", undefined, [
       { text: isMuted ? "Unmute notifications" : "Mute notifications", onPress: toggleMute },
       { text: isFavorite ? "Remove from favorites" : "Add to favorites", onPress: toggleFavorite },
       { text: "Cancel", style: "cancel" },
     ]);
+  };
+
+  const handleReactLocal = async (messageId: string, emoji: string) => {
+    setMessages((prev) => prev.map((m) => {
+      if (m._id !== messageId) return m;
+      const reactions = (m.reactions || []).filter((r: any) => r.userId !== myId);
+      reactions.push({ userId: myId, emoji });
+      return { ...m, reactions };
+    }));
+    try { await groupsService.reactToMessage(groupId, messageId, emoji); } catch (err) { console.error("React error:", err); }
+  };
+
+  const handleLongPress = (message: any) => {
+    const buttons: any[] = [
+      ...QUICK_EMOJIS.map((emoji) => ({ text: emoji, onPress: () => handleReactLocal(message._id, emoji) })),
+      { text: "Reply", onPress: () => setReplyingTo(message) },
+      { text: "Cancel", style: "cancel" },
+    ];
+    Alert.alert("Message", undefined, buttons);
+  };
+
+  const renderReactions = (message: any) => {
+    const reactions = message.reactions || [];
+    if (reactions.length === 0) return null;
+    const counts: Record<string, number> = {};
+    reactions.forEach((r: any) => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
+    return (
+      <View className="flex-row flex-wrap gap-1 mt-1">
+        {Object.entries(counts).map(([emoji, count]) => (
+          <View key={emoji} className="flex-row items-center gap-0.5 bg-navy-800 border border-navy-600 rounded-full px-1.5 py-0.5">
+            <Text className="text-[11px]">{emoji}</Text>
+            {count > 1 && <Text className="text-[10px] text-navy-400">{count}</Text>}
+          </View>
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -136,13 +194,13 @@ export default function GroupChatScreen() {
           headerStyle: { backgroundColor: "#12172a" },
           headerTintColor: "#fff",
           headerRight: () => (
-            <View className="flex-row items-center gap-3 mr-1">
+            <View className="flex-row items-center gap-1 mr-1">
               {isFavorite && <Star size={16} color="#facc15" fill="#facc15" />}
               {isMuted && <BellOff size={16} color="#4d5569" />}
-              <Pressable onPress={() => router.push({ pathname: "/(app)/groups/[groupId]/info", params: { groupId } })}>
+              <Pressable onPress={() => router.push({ pathname: "/(app)/groups/[groupId]/info", params: { groupId } })} hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }} className="p-2">
                 <Info size={20} color="#fff" />
               </Pressable>
-              <Pressable onPress={handleMenu}>
+              <Pressable onPress={handleMenu} hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }} className="p-2">
                 <MoreVertical size={20} color="#fff" />
               </Pressable>
             </View>
@@ -161,8 +219,16 @@ export default function GroupChatScreen() {
             renderItem={({ item }) => {
               const isMe = item.sender?._id === myId;
               return (
-                <View className={isMe ? "items-end mb-2" : "items-start mb-2"}>
+                <Pressable onLongPress={() => handleLongPress(item)} className={isMe ? "items-end mb-2" : "items-start mb-2"}>
                   {!isMe && <Text className="text-navy-400 text-[11px] mb-0.5 ml-1">{item.sender?.username}</Text>}
+
+                  {!!item.replyTo && (
+                    <View className="border-l-2 border-brand-500 pl-2 mb-1 max-w-[75%]">
+                      <Text className="text-brand-300 text-[11px] font-semibold">{item.replyTo.senderName}</Text>
+                      <Text className="text-navy-400 text-[11px]" numberOfLines={1}>{item.replyTo.isDeletedForEveryone ? "Message deleted" : (item.replyTo.text || "Attachment")}</Text>
+                    </View>
+                  )}
+
                   {item.mediaType === "image" ? (
                     <Pressable onPress={() => Linking.openURL(item.mediaUrl)} className="rounded-2xl overflow-hidden max-w-[75%] border border-navy-600">
                       <Image source={{ uri: item.mediaUrl }} className="w-56 h-56" resizeMode="cover" />
@@ -182,14 +248,27 @@ export default function GroupChatScreen() {
                       <Text className="text-white text-[15px]">{item.text}</Text>
                     </View>
                   )}
-                </View>
+
+                  {renderReactions(item)}
+                </Pressable>
               );
             }}
-            ListEmptyComponent={<View className="items-center py-16"><Text className="text-navy-400">No messages yet. Say hi 👋</Text></View>}
+            ListEmptyComponent={<View className="items-center py-16"><Text className="text-navy-400">No messages yet. Say hi 👋 (long-press a message to react or reply)</Text></View>}
           />
         )}
 
         {!!permissionError && <Text className="text-yellow-400 text-xs text-center px-4 pb-1">{permissionError}</Text>}
+
+        {!!replyingTo && (
+          <View className="flex-row items-center gap-2 px-4 py-2 bg-navy-800 border-t border-navy-700">
+            <CornerUpLeft size={14} color="#8478bb" />
+            <View className="flex-1">
+              <Text className="text-brand-300 text-xs font-semibold">Replying to {replyingTo.sender?.username}</Text>
+              <Text className="text-navy-400 text-xs" numberOfLines={1}>{replyingTo.text || "Attachment"}</Text>
+            </View>
+            <Pressable onPress={() => setReplyingTo(null)}><X size={16} color="#4d5569" /></Pressable>
+          </View>
+        )}
 
         <View className="flex-row items-center gap-2 px-3 py-2.5 border-t border-navy-700 bg-navy-900">
           <Pressable onPress={handleAttach} disabled={sending} className="w-10 h-10 rounded-full bg-navy-800 border border-navy-600 items-center justify-center">

@@ -1,4 +1,5 @@
-﻿import api from "./api";
+﻿
+import api from "./api";
 
 export const getGroups = (collegeId?: string, filters: any = {}) =>
   api.get("/api/ecosystem/groups", { params: { ...filters, ...(collegeId ? { collegeId } : {}) } }).then((r) => r.data);
@@ -42,11 +43,13 @@ export const sendGroupMediaMessage = (groupId: string, fileUri: string, mimeType
   return api.post(`/api/ecosystem/groups/${groupId}/messages/media`, formData).then((r) => r.data);
 };
 
-export const markGroupMessagesSeen = (groupId: string) =>
-  api.put(`/api/ecosystem/groups/${groupId}/messages/seen`).then((r) => r.data);
+export const markGroupMessagesSeen = (groupId: string) => api.put(`/api/ecosystem/groups/${groupId}/messages/seen`).then((r) => r.data);
 
-export const toggleMuteGroup = (groupId: string, muted: boolean) =>
-  api.put(`/api/ecosystem/groups/${groupId}/mute`, { muted }).then((r) => r.data);
+export const toggleMuteGroup = (groupId: string, muted: boolean) => api.put(`/api/ecosystem/groups/${groupId}/mute`, { muted }).then((r) => r.data);
+export const toggleFavoriteGroup = (groupId: string, favorite: boolean) => api.put(`/api/ecosystem/groups/${groupId}/favorite`, { favorite }).then((r) => r.data);
 
-export const toggleFavoriteGroup = (groupId: string, favorite: boolean) =>
-  api.put(`/api/ecosystem/groups/${groupId}/favorite`, { favorite }).then((r) => r.data);
+export const reactToMessage = (groupId: string, messageId: string, emoji: string) =>
+  api.put(`/api/ecosystem/groups/${groupId}/messages/${messageId}/react`, { emoji }).then((r) => r.data);
+
+export const removeReaction = (groupId: string, messageId: string) =>
+  api.delete(`/api/ecosystem/groups/${groupId}/messages/${messageId}/react`).then((r) => r.data);
