@@ -12,9 +12,7 @@ export const createCollege = (payload: {
   formData.append("university", payload.university);
   formData.append("description", payload.description);
   formData.append("isprivate", "true");
-  return api
-    .post("/api/createcollege", formData, { headers: { "Content-Type": "multipart/form-data" } })
-    .then((r) => r.data);
+return api.post("/api/createcollege", formData).then((r) => r.data);
 };
 
 export const joinCollege = (invite_code: string) =>

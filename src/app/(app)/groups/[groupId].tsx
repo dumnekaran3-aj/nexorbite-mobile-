@@ -1,7 +1,10 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
-import { View, Text, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+﻿
+import { useState, useEffect, useCallback } from "react";
+import { View, Text, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert, Linking } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { Send, Info } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import { Send, Info, Paperclip, FileText, Play, Download, MoreVertical, BellOff, Bell, Star } from "lucide-react-native";
 import * as groupsService from "@/services/groupsService";
 import { getSocket, connectSocket } from "@/sockets/socketClient";
 import { useAuthStore } from "@/store/authStore";
@@ -16,6 +19,8 @@ export default function GroupChatScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [permissionError, setPermissionError] = useState("");
+  const [isMuted, setIsMuted] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -31,16 +36,18 @@ export default function GroupChatScreen() {
 
   useEffect(() => {
     loadMessages();
+    groupsService.getGroupById(groupId).then((res) => {
+      setIsMuted(!!res.isMuted);
+      setIsFavorite(!!res.isFavorite);
+    }).catch(() => {});
+
     const socket = getSocket() || connectSocket(myId || "");
     socket.emit("join_room", { roomType: "group", roomId: groupId });
-
     const handleIncoming = (message: any) => {
       if (message.groupId === groupId) setMessages((prev) => [message, ...prev]);
     };
     socket.on("receive_group_message", handleIncoming);
-    return () => {
-      socket.off("receive_group_message", handleIncoming);
-    };
+    return () => { socket.off("receive_group_message", handleIncoming); };
   }, [groupId]);
 
   const handleSend = async () => {
@@ -53,13 +60,71 @@ export default function GroupChatScreen() {
       const data = await groupsService.sendGroupMessage(groupId, trimmed);
       setMessages((prev) => [data.message, ...prev]);
     } catch (err: any) {
-      if (err.response?.status === 403) {
-        setPermissionError("Only group admins can send messages right now.");
-      }
+      if (err.response?.status === 403) setPermissionError("Only group admins can send messages right now.");
       console.error("Send group message error:", err);
     } finally {
       setSending(false);
     }
+  };
+
+  const sendMedia = async (uri: string, mimeType: string, name: string) => {
+    setSending(true);
+    setPermissionError("");
+    try {
+      const data = await groupsService.sendGroupMediaMessage(groupId, uri, mimeType, name);
+      setMessages((prev) => [data.message, ...prev]);
+    } catch (err: any) {
+      if (err.response?.status === 403) setPermissionError("Only group admins can send messages right now.");
+      console.error("Send media error:", err);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const pickPhotoVideo = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 0.8 });
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      const mime = asset.type === "video" ? "video/mp4" : "image/jpeg";
+      sendMedia(asset.uri, mime, asset.fileName || `media_${Date.now()}.${asset.type === "video" ? "mp4" : "jpg"}`);
+    }
+  };
+
+  const pickFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true });
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+    sendMedia(asset.uri, asset.mimeType || "application/octet-stream", asset.name);
+  };
+
+  const handleAttach = () => {
+    Alert.alert("Attach", "Choose what to send", [
+      { text: "Photo / Video", onPress: pickPhotoVideo },
+      { text: "File", onPress: pickFile },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const toggleMute = async () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    try { await groupsService.toggleMuteGroup(groupId, next); } catch (err) { setIsMuted(!next); console.error(err); }
+  };
+
+  const toggleFavorite = async () => {
+    const next = !isFavorite;
+    setIsFavorite(next);
+    try { await groupsService.toggleFavoriteGroup(groupId, next); } catch (err) { setIsFavorite(!next); console.error(err); }
+  };
+
+  const handleMenu = () => {
+    Alert.alert("Group options", undefined, [
+      { text: isMuted ? "Unmute notifications" : "Mute notifications", onPress: toggleMute },
+      { text: isFavorite ? "Remove from favorites" : "Add to favorites", onPress: toggleFavorite },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   return (
@@ -71,9 +136,16 @@ export default function GroupChatScreen() {
           headerStyle: { backgroundColor: "#12172a" },
           headerTintColor: "#fff",
           headerRight: () => (
-            <Pressable onPress={() => router.push({ pathname: "/(app)/groups/[groupId]/info", params: { groupId } })} className="mr-1">
-              <Info size={20} color="#fff" />
-            </Pressable>
+            <View className="flex-row items-center gap-3 mr-1">
+              {isFavorite && <Star size={16} color="#facc15" fill="#facc15" />}
+              {isMuted && <BellOff size={16} color="#4d5569" />}
+              <Pressable onPress={() => router.push({ pathname: "/(app)/groups/[groupId]/info", params: { groupId } })}>
+                <Info size={20} color="#fff" />
+              </Pressable>
+              <Pressable onPress={handleMenu}>
+                <MoreVertical size={20} color="#fff" />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -91,9 +163,25 @@ export default function GroupChatScreen() {
               return (
                 <View className={isMe ? "items-end mb-2" : "items-start mb-2"}>
                   {!isMe && <Text className="text-navy-400 text-[11px] mb-0.5 ml-1">{item.sender?.username}</Text>}
-                  <View className={isMe ? "bg-brand-500 rounded-2xl rounded-br-sm px-3.5 py-2.5 max-w-[80%]" : "bg-navy-800 border border-navy-600 rounded-2xl rounded-bl-sm px-3.5 py-2.5 max-w-[80%]"}>
-                    <Text className="text-white text-[15px]">{item.text}</Text>
-                  </View>
+                  {item.mediaType === "image" ? (
+                    <Pressable onPress={() => Linking.openURL(item.mediaUrl)} className="rounded-2xl overflow-hidden max-w-[75%] border border-navy-600">
+                      <Image source={{ uri: item.mediaUrl }} className="w-56 h-56" resizeMode="cover" />
+                      {!!item.text && <Text className="text-white text-sm px-3 py-2 bg-navy-800">{item.text}</Text>}
+                    </Pressable>
+                  ) : item.mediaType ? (
+                    <Pressable onPress={() => Linking.openURL(item.mediaUrl)} className={isMe ? "bg-brand-500 rounded-2xl rounded-br-sm px-3.5 py-3 max-w-[80%] flex-row items-center gap-2" : "bg-navy-800 border border-navy-600 rounded-2xl rounded-bl-sm px-3.5 py-3 max-w-[80%] flex-row items-center gap-2"}>
+                      {item.mediaType === "video" ? <Play size={16} color="#fff" /> : <FileText size={16} color="#fff" />}
+                      <View className="flex-1 min-w-0">
+                        <Text className="text-white text-sm" numberOfLines={1}>{item.fileName || "Attachment"}</Text>
+                        <Text className="text-white/60 text-[11px] mt-0.5">{item.mediaType === "video" ? "Video · tap to open" : "File · tap to open"}</Text>
+                      </View>
+                      <Download size={14} color="#fff" />
+                    </Pressable>
+                  ) : (
+                    <View className={isMe ? "bg-brand-500 rounded-2xl rounded-br-sm px-3.5 py-2.5 max-w-[80%]" : "bg-navy-800 border border-navy-600 rounded-2xl rounded-bl-sm px-3.5 py-2.5 max-w-[80%]"}>
+                      <Text className="text-white text-[15px]">{item.text}</Text>
+                    </View>
+                  )}
                 </View>
               );
             }}
@@ -101,11 +189,12 @@ export default function GroupChatScreen() {
           />
         )}
 
-        {!!permissionError && (
-          <Text className="text-yellow-400 text-xs text-center px-4 pb-1">{permissionError}</Text>
-        )}
+        {!!permissionError && <Text className="text-yellow-400 text-xs text-center px-4 pb-1">{permissionError}</Text>}
 
         <View className="flex-row items-center gap-2 px-3 py-2.5 border-t border-navy-700 bg-navy-900">
+          <Pressable onPress={handleAttach} disabled={sending} className="w-10 h-10 rounded-full bg-navy-800 border border-navy-600 items-center justify-center">
+            <Paperclip size={16} color="#8478bb" />
+          </Pressable>
           <TextInput
             value={text}
             onChangeText={setText}

@@ -21,10 +21,11 @@ export default function GroupInfoScreen() {
 
   const load = useCallback(async () => {
     try {
-      const groupRes = await groupsService.getGroupById(groupId);
-      setGroup(groupRes.group);
+     const groupRes = await groupsService.getGroupById(groupId);
+setGroup(groupRes.group);
 
-      const myRole = groupRes.group?.myRole;
+const myRole = groupRes.myRole;
+
       const admin = myRole === "creator" || myRole === "admin";
       setIsAdmin(admin);
 

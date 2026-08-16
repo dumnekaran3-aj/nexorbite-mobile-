@@ -8,6 +8,12 @@ export const getMyGroups = () => api.get("/api/ecosystem/groups/my-groups").then
 export const createGroup = (payload: any, collegeId?: string) =>
   api.post("/api/ecosystem/groups", { ...payload, ...(collegeId ? { collegeId } : {}) }).then((r) => r.data);
 
+export const uploadGroupAvatar = (groupId: string, fileUri: string) => {
+  const formData = new FormData();
+  formData.append("icon", { uri: fileUri, name: "group-icon.jpg", type: "image/jpeg" } as any);
+  return api.post(`/api/ecosystem/groups/${groupId}/avatar`, formData).then((r) => r.data);
+};
+
 export const getGroupById = (groupId: string) => api.get(`/api/ecosystem/groups/${groupId}`).then((r) => r.data);
 
 export const joinGroup = (groupId: string) => api.post(`/api/ecosystem/groups/${groupId}/join`).then((r) => r.data);
@@ -29,5 +35,18 @@ export const getGroupMessages = (groupId: string, page = 1, limit = 50) =>
 export const sendGroupMessage = (groupId: string, text: string, replyTo?: string) =>
   api.post(`/api/ecosystem/groups/${groupId}/messages`, { text, replyTo }).then((r) => r.data);
 
+export const sendGroupMediaMessage = (groupId: string, fileUri: string, mimeType: string, fileName: string, text?: string) => {
+  const formData = new FormData();
+  formData.append("file", { uri: fileUri, name: fileName, type: mimeType } as any);
+  if (text?.trim()) formData.append("text", text.trim());
+  return api.post(`/api/ecosystem/groups/${groupId}/messages/media`, formData).then((r) => r.data);
+};
+
 export const markGroupMessagesSeen = (groupId: string) =>
   api.put(`/api/ecosystem/groups/${groupId}/messages/seen`).then((r) => r.data);
+
+export const toggleMuteGroup = (groupId: string, muted: boolean) =>
+  api.put(`/api/ecosystem/groups/${groupId}/mute`, { muted }).then((r) => r.data);
+
+export const toggleFavoriteGroup = (groupId: string, favorite: boolean) =>
+  api.put(`/api/ecosystem/groups/${groupId}/favorite`, { favorite }).then((r) => r.data);
