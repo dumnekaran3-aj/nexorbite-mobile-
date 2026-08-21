@@ -1,5 +1,4 @@
-﻿
-import api from "./api";
+﻿import api from "./api";
 
 export const getGroups = (collegeId?: string, filters: any = {}) =>
   api.get("/api/ecosystem/groups", { params: { ...filters, ...(collegeId ? { collegeId } : {}) } }).then((r) => r.data);
@@ -29,6 +28,7 @@ export const getGroupMembers = (groupId: string) => api.get(`/api/ecosystem/grou
 export const removeMember = (groupId: string, userId: string) => api.delete(`/api/ecosystem/groups/${groupId}/members/${userId}`).then((r) => r.data);
 export const promoteToAdmin = (groupId: string, userId: string) => api.post(`/api/ecosystem/groups/${groupId}/members/${userId}/promote`).then((r) => r.data);
 export const demoteAdmin = (groupId: string, userId: string) => api.post(`/api/ecosystem/groups/${groupId}/members/${userId}/demote`).then((r) => r.data);
+export const getOnlineGroupMembers = (groupId: string) => api.get(`/api/ecosystem/groups/${groupId}/online-members`).then((r) => r.data);
 
 export const getGroupMessages = (groupId: string, page = 1, limit = 50) =>
   api.get(`/api/ecosystem/groups/${groupId}/messages`, { params: { page, limit } }).then((r) => r.data);
@@ -43,6 +43,10 @@ export const sendGroupMediaMessage = (groupId: string, fileUri: string, mimeType
   return api.post(`/api/ecosystem/groups/${groupId}/messages/media`, formData).then((r) => r.data);
 };
 
+export const getStickerPack = () => api.get("/api/ecosystem/groups/stickers").then((r) => r.data);
+export const sendSticker = (groupId: string, stickerId: string) =>
+  api.post(`/api/ecosystem/groups/${groupId}/messages/sticker`, { stickerId }).then((r) => r.data);
+
 export const markGroupMessagesSeen = (groupId: string) => api.put(`/api/ecosystem/groups/${groupId}/messages/seen`).then((r) => r.data);
 
 export const toggleMuteGroup = (groupId: string, muted: boolean) => api.put(`/api/ecosystem/groups/${groupId}/mute`, { muted }).then((r) => r.data);
@@ -50,6 +54,17 @@ export const toggleFavoriteGroup = (groupId: string, favorite: boolean) => api.p
 
 export const reactToMessage = (groupId: string, messageId: string, emoji: string) =>
   api.put(`/api/ecosystem/groups/${groupId}/messages/${messageId}/react`, { emoji }).then((r) => r.data);
-
 export const removeReaction = (groupId: string, messageId: string) =>
   api.delete(`/api/ecosystem/groups/${groupId}/messages/${messageId}/react`).then((r) => r.data);
+
+export const searchGroupMessages = (groupId: string, q: string) =>
+  api.get(`/api/ecosystem/groups/${groupId}/messages/search`, { params: { q } }).then((r) => r.data);
+
+export const bulkDeleteForMe = (groupId: string, messageIds: string[]) =>
+  api.put(`/api/ecosystem/groups/${groupId}/messages/bulk-delete-me`, { messageIds }).then((r) => r.data);
+
+export const bulkDeleteForAll = (groupId: string, messageIds: string[]) =>
+  api.put(`/api/ecosystem/groups/${groupId}/messages/bulk-delete-all`, { messageIds }).then((r) => r.data);
+
+export const clearChatForMe = (groupId: string) =>
+  api.put(`/api/ecosystem/groups/${groupId}/messages/clear-for-me`).then((r) => r.data);

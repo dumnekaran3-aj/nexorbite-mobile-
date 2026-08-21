@@ -1,13 +1,11 @@
 ﻿import axios from "axios";
 import { storage } from "../utils/storage";
+import ENV from "../config/env";
 
-// Direct hardcoded for local testing
-const LOCAL_API_URL = "http://localhost:3000";
-
-console.log("🚀 FORCE LOCAL API URL:", LOCAL_API_URL);
+console.log("API baseURL:", ENV.API_URL);
 
 const api = axios.create({
-  baseURL: LOCAL_API_URL,
+  baseURL: ENV.API_URL,
   timeout: 15000,
 });
 

@@ -1,7 +1,6 @@
 ﻿import { Tabs } from "expo-router";
 import { View, Text } from "react-native";
-import { Newspaper, UsersRound, MessageCircle, UserCircle, Users } from "lucide-react-native";
-import { useFriendsStore } from "@/store/friendsStore";
+import { Newspaper, Compass, MessageCircle, UserCircle, Users } from "lucide-react-native";
 import { useChatStore } from "@/store/chatStore";
 
 function Badge({ count }: { count: number }) {
@@ -14,7 +13,6 @@ function Badge({ count }: { count: number }) {
 }
 
 export default function TabsLayout() {
-  const incomingCount = useFriendsStore((s) => s.incomingCount);
   const chats = useChatStore((s) => s.chats);
   const unreadTotal = chats.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
@@ -29,15 +27,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Feed", tabBarIcon: ({ color, size }) => <Newspaper color={color} size={size} /> }} />
       <Tabs.Screen name="groups" options={{ title: "Groups", tabBarIcon: ({ color, size }) => <Users color={color} size={size} /> }} />
-      <Tabs.Screen
-        name="friends"
-        options={{
-          title: "Friends",
-          tabBarIcon: ({ color, size }) => (
-            <View><UsersRound color={color} size={size} /><Badge count={incomingCount} /></View>
-          ),
-        }}
-      />
+      <Tabs.Screen name="friends" options={{ title: "Discover", tabBarIcon: ({ color, size }) => <Compass color={color} size={size} /> }} />
       <Tabs.Screen
         name="chat"
         options={{

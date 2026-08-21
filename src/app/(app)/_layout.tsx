@@ -4,9 +4,11 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as collegeService from "@/services/collegeService";
 import { useCollegeStore } from "@/store/collegeStore";
 import { useAuthStore } from "@/store/authStore";
-import { connectSocket } from "@/sockets/socketClient";
+import { connectSocket, getSocket } from "@/sockets/socketClient";
 import { registerSocketListeners } from "@/sockets/socketListeners";
 import { useChatStore } from "@/store/chatStore";
+import { useNotificationStore } from "@/store/notificationStore";
+import { useToastStore } from "@/store/toastStore";
 import Toast from "@/components/ui/Toast";
 
 export default function AppLayout() {
@@ -27,11 +29,9 @@ export default function AppLayout() {
   useEffect(() => {
     if (checking) return;
     const onGateScreen = segments[segments.length - 1] === "join-college";
-
     if (!isJoined && !onGateScreen) {
       router.replace("/(app)/join-college");
     } else if (isJoined && onGateScreen) {
-      // Already joined but somehow sitting on the gate screen — send them home.
       router.replace("/(app)");
     }
   }, [checking, isJoined, segments]);
@@ -41,6 +41,15 @@ export default function AppLayout() {
       connectSocket(user._id, collegeId || undefined);
       registerSocketListeners();
       useChatStore.getState().loadChats();
+      useNotificationStore.getState().refresh();
+
+      const socket = getSocket();
+      const handleNewNotification = (data: any) => {
+        useNotificationStore.getState().increment();
+        useToastStore.getState().show(data.payload?.message || "You have a new notification");
+      };
+      socket?.on("new_notification", handleNewNotification);
+      return () => { socket?.off("new_notification", handleNewNotification); };
     }
   }, [checking, isJoined, user?._id, collegeId]);
 

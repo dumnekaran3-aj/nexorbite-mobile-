@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { GraduationCap, Check, X, Shield, UserMinus } from "lucide-react-native";
 import Button from "@/components/ui/Button";
 import * as groupsService from "@/services/groupsService";
+import { getSocket } from "@/sockets/socketClient";
 
 type Segment = "members" | "requests";
 
@@ -15,17 +16,17 @@ export default function GroupInfoScreen() {
   const [segment, setSegment] = useState<Segment>("members");
   const [members, setMembers] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [leaving, setLeaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const load = useCallback(async () => {
     try {
-     const groupRes = await groupsService.getGroupById(groupId);
-setGroup(groupRes.group);
+      const groupRes = await groupsService.getGroupById(groupId);
+      setGroup(groupRes.group);
 
-const myRole = groupRes.myRole;
-
+      const myRole = groupRes.myRole;
       const admin = myRole === "creator" || myRole === "admin";
       setIsAdmin(admin);
 
@@ -39,6 +40,9 @@ const myRole = groupRes.myRole;
       } else {
         setMembers(groupRes.group?.memberDetails || []);
       }
+
+      const onlineRes = await groupsService.getOnlineGroupMembers(groupId);
+      setOnlineIds(new Set((onlineRes.members || []).filter((m: any) => m.isOnline).map((m: any) => m.userId)));
     } catch (err) {
       console.error("Group info error:", err);
     } finally {
@@ -46,16 +50,28 @@ const myRole = groupRes.myRole;
     }
   }, [groupId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const socket = getSocket();
+    if (!socket) return;
+    const handleStatusChange = ({ userId, status }: any) => {
+      setOnlineIds((prev) => {
+        const next = new Set(prev);
+        if (status === "online") next.add(userId);
+        else next.delete(userId);
+        return next;
+      });
+    };
+    socket.on("user_status_changed", handleStatusChange);
+    return () => { socket.off("user_status_changed", handleStatusChange); };
+  }, [load]);
 
   const handleRespond = async (requestId: string, action: "accept" | "decline") => {
     try {
       await groupsService.respondToJoinRequest(groupId, requestId, action);
       setRequests((prev) => prev.filter((r) => r._id !== requestId));
       if (action === "accept") load();
-    } catch (err) {
-      console.error("Respond error:", err);
-    }
+    } catch (err) { console.error("Respond error:", err); }
   };
 
   const handlePromote = async (userId: string) => {
@@ -81,9 +97,7 @@ const myRole = groupRes.myRole;
         try {
           await groupsService.leaveGroup(groupId);
           router.push("/(app)/(tabs)/groups");
-        } catch (err) {
-          console.error(err);
-        } finally { setLeaving(false); }
+        } catch (err) { console.error(err); } finally { setLeaving(false); }
       }},
     ]);
   };
@@ -99,6 +113,7 @@ const myRole = groupRes.myRole;
         <View className="px-5 py-5 border-b border-navy-700">
           <Text className="text-white text-lg font-bold">{group?.name}</Text>
           {!!group?.description && <Text className="text-navy-400 text-sm mt-1">{group.description}</Text>}
+          <Text className="text-navy-400 text-xs mt-2">{onlineIds.size} online</Text>
         </View>
 
         {isAdmin && (
@@ -117,33 +132,40 @@ const myRole = groupRes.myRole;
             data={members}
             keyExtractor={(item) => item._id || item.userId}
             contentContainerClassName="px-4 py-3"
-            renderItem={({ item }) => (
-              <View className="flex-row items-center gap-3 py-2.5 border-b border-navy-800">
-                <View className="w-9 h-9 rounded-full bg-navy-700 border border-navy-600 items-center justify-center overflow-hidden">
-                  {item.avatar ? <Image source={{ uri: item.avatar }} className="w-full h-full" /> : <GraduationCap size={14} color="#a79fd3" />}
-                </View>
-                <View className="flex-1">
-                  <Text className="text-white text-sm">{item.username || item.fullName}</Text>
-                  {!!item.role && item.role !== "member" && <Text className="text-brand-300 text-[10px] mt-0.5 uppercase">{item.role}</Text>}
-                </View>
-                {isAdmin && item.role !== "creator" && (
-                  <View className="flex-row gap-2">
-                    {item.role === "admin" ? (
-                      <Pressable onPress={() => handleDemote(item._id || item.userId)} className="w-8 h-8 rounded-full bg-navy-700 items-center justify-center">
-                        <Shield size={14} color="#4d5569" />
-                      </Pressable>
-                    ) : (
-                      <Pressable onPress={() => handlePromote(item._id || item.userId)} className="w-8 h-8 rounded-full bg-brand-500/15 items-center justify-center">
-                        <Shield size={14} color="#8478bb" />
-                      </Pressable>
-                    )}
-                    <Pressable onPress={() => handleRemove(item._id || item.userId, item.username)} className="w-8 h-8 rounded-full bg-red-500/15 items-center justify-center">
-                      <UserMinus size={14} color="#f87171" />
-                    </Pressable>
+            renderItem={({ item }) => {
+              const uid = item._id || item.userId;
+              const online = onlineIds.has(uid);
+              return (
+                <View className="flex-row items-center gap-3 py-2.5 border-b border-navy-800">
+                  <View className="relative">
+                    <View className="w-9 h-9 rounded-full bg-navy-700 border border-navy-600 items-center justify-center overflow-hidden">
+                      {item.avatar ? <Image source={{ uri: item.avatar }} className="w-full h-full" /> : <GraduationCap size={14} color="#a79fd3" />}
+                    </View>
+                    {online && <View className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border border-navy-900" />}
                   </View>
-                )}
-              </View>
-            )}
+                  <View className="flex-1">
+                    <Text className="text-white text-sm">{item.username || item.fullName}</Text>
+                    {!!item.role && item.role !== "member" && <Text className="text-brand-300 text-[10px] mt-0.5 uppercase">{item.role}</Text>}
+                  </View>
+                  {isAdmin && item.role !== "creator" && (
+                    <View className="flex-row gap-2">
+                      {item.role === "admin" ? (
+                        <Pressable onPress={() => handleDemote(uid)} className="w-8 h-8 rounded-full bg-navy-700 items-center justify-center">
+                          <Shield size={14} color="#4d5569" />
+                        </Pressable>
+                      ) : (
+                        <Pressable onPress={() => handlePromote(uid)} className="w-8 h-8 rounded-full bg-brand-500/15 items-center justify-center">
+                          <Shield size={14} color="#8478bb" />
+                        </Pressable>
+                      )}
+                      <Pressable onPress={() => handleRemove(uid, item.username)} className="w-8 h-8 rounded-full bg-red-500/15 items-center justify-center">
+                        <UserMinus size={14} color="#f87171" />
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              );
+            }}
             ListEmptyComponent={<Text className="text-navy-400 text-center py-10">No members yet.</Text>}
           />
         )}

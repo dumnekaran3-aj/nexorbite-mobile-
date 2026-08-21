@@ -23,6 +23,12 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
     } catch (err: any) {
+
+      
+       console.log("LOGIN ERROR STATUS:", err.response?.status);
+  console.log("LOGIN ERROR DATA:", JSON.stringify(err.response?.data));
+  console.log("REQUEST URL:", err.config?.baseURL, err.config?.url);
+
       if (err.response?.data?.needsVerification) {
         router.push({ pathname: "/(auth)/verify-otp", params: { email: email.trim() } });
         return;

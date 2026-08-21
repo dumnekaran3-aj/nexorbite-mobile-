@@ -1,9 +1,10 @@
-﻿import { useEffect } from "react";
+﻿import { useEffect, useCallback } from "react";
 import { View, Text, FlatList, Image, Pressable, ActivityIndicator, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { useCallback } from "react";
-import { GraduationCap, MessageCircleOff } from "lucide-react-native";
+import { GraduationCap, MessageCircleOff, UserPlus } from "lucide-react-native";
 import { useChatStore } from "@/store/chatStore";
+import { useFriendsStore } from "@/store/friendsStore";
+import * as friendsService from "@/services/friendsService";
 
 function Avatar({ uri }: { uri?: string }) {
   return (
@@ -18,25 +19,38 @@ export default function ChatListScreen() {
   const chats = useChatStore((s) => s.chats);
   const loading = useChatStore((s) => s.loading);
   const loadChats = useChatStore((s) => s.loadChats);
+  const incomingCount = useFriendsStore((s) => s.incomingCount);
+  const setIncomingCount = useFriendsStore((s) => s.setIncomingCount);
 
   useFocusEffect(
     useCallback(() => {
       loadChats();
+      friendsService
+        .getIncomingRequests()
+        .then((res) => setIncomingCount((res.requests || []).length))
+        .catch(() => {});
     }, [])
   );
 
   if (loading && chats.length === 0) {
-    return (
-      <View className="flex-1 bg-navy-900 items-center justify-center">
-        <ActivityIndicator color="#8478bb" />
-      </View>
-    );
+    return <View className="flex-1 bg-navy-900 items-center justify-center"><ActivityIndicator color="#8478bb" /></View>;
   }
 
   return (
     <View className="flex-1 bg-navy-900">
-      <View className="px-4 pt-14 pb-3 border-b border-navy-700">
+      <View className="flex-row items-center justify-between px-4 pt-14 pb-3 border-b border-navy-700">
         <Text className="text-white text-xl font-bold tracking-tight">Chat</Text>
+        <Pressable
+          onPress={() => router.push("/(app)/friend-requests")}
+          className="w-9 h-9 rounded-full bg-navy-800 border border-navy-600 items-center justify-center relative"
+        >
+          <UserPlus size={17} color="#a79fd3" />
+          {incomingCount > 0 && (
+            <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[16px] h-4 items-center justify-center px-1">
+              <Text className="text-white text-[9px] font-bold">{incomingCount > 9 ? "9+" : incomingCount}</Text>
+            </View>
+          )}
+        </Pressable>
       </View>
 
       <FlatList

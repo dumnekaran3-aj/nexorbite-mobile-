@@ -1,233 +1,171 @@
-﻿import { useState, useEffect, useCallback } from "react";
-import { View, Text, FlatList, Image, Pressable, ActivityIndicator, RefreshControl } from "react-native";
+﻿import * as discoverService from "@/services/discoverService";
 import { useRouter } from "expo-router";
-import { GraduationCap, UserPlus, Check, X } from "lucide-react-native";
-import * as friendsService from "@/services/friendsService";
-import * as membersService from "@/services/membersService";
-import { useFriendsStore } from "@/store/friendsStore";
+import { Check, Crown, GraduationCap, Handshake, Search, Shield, Sparkles, UserPlus, Users } from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, Image, Pressable, Text, TextInput, View } from "react-native";
 
-type Segment = "friends" | "requests" | "find";
-
-function Avatar({ uri, size = 44 }: { uri?: string; size?: number }) {
-  return (
-    <View
-      style={{ width: size, height: size, borderRadius: size / 2 }}
-      className="bg-navy-700 border border-navy-600 items-center justify-center overflow-hidden"
-    >
-      {uri ? <Image source={{ uri }} className="w-full h-full" /> : <GraduationCap size={size * 0.4} color="#a79fd3" />}
-    </View>
-  );
-}
-
-export default function FriendsScreen() {
+export default function DiscoverScreen() {
   const router = useRouter();
-  const [segment, setSegment] = useState<Segment>("friends");
-
-  const [friends, setFriends] = useState<any[]>([]);
-  const [incoming, setIncoming] = useState<any[]>([]);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
-
+  const [people, setPeople] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const loadAll = useCallback(async () => {
+  const fetchPage = useCallback(async (pageNum: number) => {
     try {
-      const [friendsRes, incomingRes, suggestRes] = await Promise.all([
-        friendsService.getFriends(),
-        friendsService.getIncomingRequests(),
-        membersService.getSameBranchStudents(),
-      ]);
-      setFriends(friendsRes.friends || []);
-      setIncoming(incomingRes.requests || []);
-      useFriendsStore.getState().setIncomingCount((incomingRes.requests || []).length);
-      setSuggestions(suggestRes.students || []);
-    } catch (err) {
-      console.error("Friends load error:", err);
+      const res = await discoverService.getDiscoverFeed(pageNum, 20);
+     setPeople((prev) => (pageNum === 1 ? res.users || [] : [...prev, ...(res.users || [])]));
+setHasMore((res.users || []).length === 20);
+      setPage(pageNum);
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        setLocked(true);
+      } else {
+        console.error("Discover fetch error:", err);
+      }
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      setLoadingMore(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  useEffect(() => { fetchPage(1); }, [fetchPage]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadAll();
+  const loadMore = () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    fetchPage(page + 1);
   };
 
-  const handleAccept = async (requestId: string) => {
+  const toggleCollab = async (person: any) => {
+    setBusyId(person._id);
+    const next = !person.isCollabing;
+    setPeople((prev) => prev.map((p) => (p._id === person._id ? { ...p, isCollabing: next } : p)));
     try {
-      await friendsService.acceptFriendRequest(requestId);
-      loadAll();
+      if (next) await discoverService.collabWith(person._id);
+      else await discoverService.uncollab(person._id);
     } catch (err) {
-      console.error("Accept error:", err);
+      setPeople((prev) => prev.map((p) => (p._id === person._id ? { ...p, isCollabing: !next } : p)));
+      console.error("Collab toggle error:", err);
+    } finally {
+      setBusyId(null);
     }
   };
 
-  const handleDecline = async (requestId: string) => {
-    try {
-      await friendsService.declineFriendRequest(requestId);
-      setIncoming((prev) => prev.filter((r) => r._id !== requestId));
-    } catch (err) {
-      console.error("Decline error:", err);
-    }
-  };
-
-  const handleSendRequest = async (toUserId: string) => {
-    setSentIds((prev) => new Set(prev).add(toUserId));
-    try {
-      await friendsService.sendFriendRequest(toUserId);
-    } catch (err) {
-      console.error("Send request error:", err);
-      setSentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(toUserId);
-        return next;
-      });
-    }
-  };
-
-  const openProfile = (userId: string) => {
-    router.push(`/(app)/friends/public-profile/${userId}` as any);
-  };
-
-  const SegmentButton = ({ id, label, count }: { id: Segment; label: string; count?: number }) => (
-    <Pressable
-      onPress={() => setSegment(id)}
-      className={
-        segment === id
-          ? "flex-1 items-center py-2.5 border-b-2 border-brand-500"
-          : "flex-1 items-center py-2.5 border-b-2 border-transparent"
-      }
-    >
-      <Text className={segment === id ? "text-white text-sm font-semibold" : "text-navy-400 text-sm"}>
-        {label}
-        {!!count && count > 0 ? ` (${count})` : ""}
-      </Text>
-    </Pressable>
-  );
+  const q = query.trim().toLowerCase();
+  const filtered = !q
+    ? people
+    : people.filter(
+        (p) =>
+          p.username?.toLowerCase().includes(q) ||
+          p.fullName?.toLowerCase().includes(q) ||
+          p.stream?.toLowerCase().includes(q) ||
+          p.skills?.some((s: string) => s.toLowerCase().includes(q))
+      );
 
   if (loading) {
+    return <View className="flex-1 bg-navy-900 items-center justify-center"><ActivityIndicator color="#8478bb" /></View>;
+  }
+
+  if (locked) {
     return (
-      <View className="flex-1 bg-navy-900 items-center justify-center">
-        <ActivityIndicator color="#8478bb" />
+      <View className="flex-1 bg-navy-900 items-center justify-center px-6">
+        <View className="w-20 h-20 rounded-full bg-yellow-500/10 border border-yellow-500/20 items-center justify-center mb-5">
+          <Crown size={30} color="#facc15" />
+        </View>
+        <Text className="text-white text-xl font-extrabold mb-2 text-center">Discover is a Premium Feature</Text>
+        <Text className="text-navy-400 text-sm text-center max-w-xs">
+          Find same-skill, same-vibe people from every college on NexOrbite — matched by your skills, stream, and trust score.
+        </Text>
       </View>
     );
   }
 
   return (
     <View className="flex-1 bg-navy-900">
-      <View className="px-4 pt-14 pb-2">
-        <Text className="text-white text-xl font-bold tracking-tight">Friends</Text>
+      <View className="px-4 pt-14 pb-3 border-b border-navy-700">
+        <Text className="text-white text-xl font-bold tracking-tight mb-3">Discover</Text>
+        <View className="flex-row items-center gap-2 bg-navy-800 border border-navy-600 rounded-full px-3.5 py-2">
+          <Search size={15} color="#4d5569" />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name, stream, or skill..."
+            placeholderTextColor="#4d5569"
+            className="flex-1 text-white text-sm"
+          />
+        </View>
       </View>
 
-      <View className="flex-row border-b border-navy-700 mb-1">
-        <SegmentButton id="friends" label="Friends" />
-        <SegmentButton id="requests" label="Requests" count={incoming.length} />
-        <SegmentButton id="find" label="Find People" />
-      </View>
-
-      {segment === "friends" && (
-        <FlatList
-          data={friends}
-          keyExtractor={(item) => item._id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8478bb" />}
-          contentContainerClassName="px-4 py-3"
-          renderItem={({ item }) => (
-            <Pressable onPress={() => openProfile(item._id)} className="flex-row items-center gap-3 py-3 border-b border-navy-800">
-              <Avatar uri={item.avatar} />
-              <View className="flex-1">
-                <Text className="text-white font-semibold">{item.fullName || item.username}</Text>
-                {!!item.stream && <Text className="text-navy-400 text-xs mt-0.5">{item.stream}</Text>}
-              </View>
-            </Pressable>
-          )}
-          ListEmptyComponent={
-            <View className="items-center py-16">
-              <Text className="text-navy-400 text-center">
-                No friends yet.{"\n"}Head to "Find People" to connect with classmates.
-              </Text>
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item._id}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={loadingMore ? <ActivityIndicator className="my-4" color="#8478bb" /> : null}
+        renderItem={({ item }) => (
+          <Pressable
+            onPress={() => router.push(`/(app)/friends/public-profile/${item._id}` as any)}
+            className="flex-row items-center gap-3 px-4 py-3 border-b border-navy-800"
+          >
+            <View className="w-14 h-14 rounded-full bg-navy-700 border border-navy-600 items-center justify-center overflow-hidden">
+              {item.avatar ? <Image source={{ uri: item.avatar }} className="w-full h-full" /> : <GraduationCap size={22} color="#a79fd3" />}
             </View>
-          }
-        />
-      )}
 
-      {segment === "requests" && (
-        <FlatList
-          data={incoming}
-          keyExtractor={(item) => item._id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8478bb" />}
-          contentContainerClassName="px-4 py-3"
-          renderItem={({ item }) => (
-            <View className="flex-row items-center gap-3 py-3 border-b border-navy-800">
-              <Avatar uri={item.from?.avatar} />
-              <View className="flex-1">
-                <Text className="text-white font-semibold">{item.from?.fullName || item.from?.username}</Text>
-                <Text className="text-navy-400 text-xs mt-0.5">wants to be friends</Text>
-              </View>
-              <Pressable onPress={() => handleAccept(item._id)} className="w-9 h-9 rounded-full bg-green-500/15 items-center justify-center">
-                <Check size={16} color="#4ade80" />
-              </Pressable>
-              <Pressable onPress={() => handleDecline(item._id)} className="w-9 h-9 rounded-full bg-red-500/15 items-center justify-center">
-                <X size={16} color="#f87171" />
-              </Pressable>
-            </View>
-          )}
-          ListEmptyComponent={
-            <View className="items-center py-16">
-              <Text className="text-navy-400">No pending requests.</Text>
-            </View>
-          }
-        />
-      )}
-
-      {segment === "find" && (
-        <FlatList
-          data={suggestions}
-          keyExtractor={(item) => item._id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8478bb" />}
-          contentContainerClassName="px-4 py-3"
-          renderItem={({ item }) => {
-            const alreadySent = sentIds.has(item._id);
-            return (
-              <Pressable onPress={() => openProfile(item._id)} className="flex-row items-center gap-3 py-3 border-b border-navy-800">
-                <Avatar uri={item.avatar} />
-                <View className="flex-1">
-                  <Text className="text-white font-semibold">{item.fullName || item.username}</Text>
-                  {!!item.stream && <Text className="text-navy-400 text-xs mt-0.5">{item.stream}</Text>}
+            <View className="flex-1 min-w-0">
+              <View className="flex-row items-center justify-between gap-2">
+                <Text className="text-white font-bold text-sm flex-1" numberOfLines={1}>@{item.username}</Text>
+                <View className="flex-row items-center gap-1 px-1.5 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+                  <Sparkles size={10} color="#facc15" />
+                  <Text className="text-yellow-400 text-[10px] font-bold">{item.matchScore}%</Text>
                 </View>
-                <Pressable
-                  onPress={() => handleSendRequest(item._id)}
-                  disabled={alreadySent}
-                  className={
-                    alreadySent
-                      ? "px-3 py-1.5 rounded-full bg-navy-800 border border-navy-600"
-                      : "px-3 py-1.5 rounded-full bg-brand-500/15 border border-brand-500/40 flex-row items-center gap-1"
-                  }
-                >
-                  {alreadySent ? (
-                    <Text className="text-navy-400 text-xs">Sent</Text>
-                  ) : (
-                    <>
-                      <UserPlus size={13} color="#8478bb" />
-                      <Text className="text-brand-300 text-xs font-semibold">Add</Text>
-                    </>
-                  )}
-                </Pressable>
-              </Pressable>
-            );
-          }}
-          ListEmptyComponent={
-            <View className="items-center py-16">
-              <Text className="text-navy-400 text-center">No suggestions right now.{"\n"}Check back later.</Text>
+              </View>
+
+              <Text className="text-navy-400 text-xs mt-0.5" numberOfLines={1}>
+                {item.fullName}{item.stream ? ` · ${item.stream}` : ""}
+              </Text>
+
+              {!!item.skills?.length && (
+                <View className="flex-row flex-wrap gap-1 mt-1.5">
+                  {item.skills.slice(0, 4).map((s: string) => (
+                    <View key={s} className="px-2 py-0.5 rounded-full bg-brand-500/10 border border-brand-500/20">
+                      <Text className="text-brand-300 text-[10px]">{s}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              <View className="flex-row items-center gap-3 mt-1.5">
+                <View className="flex-row items-center gap-1">
+                  <Shield size={11} color="#4d5569" />
+                  <Text className="text-navy-500 text-[10px]">{item.trustScore || 0} Trust</Text>
+                </View>
+                <View className="flex-row items-center gap-1">
+                  <Handshake size={11} color="#4d5569" />
+                  <Text className="text-navy-500 text-[10px]">{item.collabCount || 0} Collabs</Text>
+                </View>
+                <View className="flex-row items-center gap-1">
+                  <Users size={11} color="#4d5569" />
+                  <Text className="text-navy-500 text-[10px]">{item.friendsCount || 0} Friends</Text>
+                </View>
+              </View>
             </View>
-          }
-        />
-      )}
+
+            <Pressable
+              onPress={(e) => { e.stopPropagation(); toggleCollab(item); }}
+              disabled={busyId === item._id}
+              className={item.isCollabing ? "w-9 h-9 rounded-full bg-navy-700 border border-navy-600 items-center justify-center" : "w-9 h-9 rounded-full bg-brand-500 items-center justify-center"}
+            >
+              {item.isCollabing ? <Check size={16} color="#8478bb" /> : <UserPlus size={16} color="#fff" />}
+            </Pressable>
+          </Pressable>
+        )}
+        ListEmptyComponent={<Text className="text-navy-400 text-center py-16">{query ? "No one matches your search." : "No one to discover right now."}</Text>}
+      />
     </View>
   );
 }

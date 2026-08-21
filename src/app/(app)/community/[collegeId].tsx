@@ -217,19 +217,31 @@ export default function CommunityPageScreen() {
           <TabButton id="discover" label="Discover" />
         </View>
 
-        {tab === "feed" && (
-          feedLoading ? <View className="flex-1 items-center justify-center"><ActivityIndicator color="#8478bb" /></View> : (
-            <FlatList
-              data={feedPosts}
-              keyExtractor={(item) => item._id}
-              refreshControl={<RefreshControl refreshing={false} onRefresh={loadFeed} tintColor="#8478bb" />}
-              renderItem={({ item }) => (
-                <FeedPost post={item} onOpen={() => router.push({ pathname: "/(app)/feed/[postId]", params: { postId: item._id, fallback: JSON.stringify(item) } })} />
-              )}
-              ListEmptyComponent={<Text className="text-navy-400 text-center py-16">No products in this community's feed yet.</Text>}
-            />
-          )
+    {tab === "feed" && (
+  <>
+    <View className="px-4 pt-3">
+      <Pressable
+        onPress={() => router.push({ pathname: "/(app)/feed/create", params: { collegeId } })}
+        className="flex-row items-center justify-center gap-2 border border-brand-500/40 bg-brand-500/10 rounded-full py-2.5"
+      >
+        <Text className="text-brand-300 text-sm font-semibold">+ Post to this community</Text>
+      </Pressable>
+    </View>
+    {feedLoading ? (
+      <View className="flex-1 items-center justify-center"><ActivityIndicator color="#8478bb" /></View>
+    ) : (
+      <FlatList
+        data={feedPosts}
+        keyExtractor={(item) => item._id}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={loadFeed} tintColor="#8478bb" />}
+        renderItem={({ item }) => (
+          <FeedPost post={item} onOpen={() => router.push({ pathname: "/(app)/feed/[postId]", params: { postId: item._id, fallback: JSON.stringify(item) } })} />
         )}
+        ListEmptyComponent={<Text className="text-navy-400 text-center py-16">No products in this community's feed yet.</Text>}
+      />
+    )}
+  </>
+)}
 
         {tab === "members" && (
           membersLoading ? <View className="flex-1 items-center justify-center"><ActivityIndicator color="#8478bb" /></View> : (
