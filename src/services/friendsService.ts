@@ -16,3 +16,4 @@ export const checkFriendshipStatus = (userId: string) => api.get(`/api/ecosystem
 export const blockUser = (userId: string) => api.post("/api/ecosystem/friends/block", { userId }).then((r) => r.data);
 export const unblockUser = (userId: string) => api.post("/api/ecosystem/friends/unblock", { userId }).then((r) => r.data);
 export const getPublicProfile = (id: string) => api.get(`/api/ecosystem/friends/public-profile/${id}`).then((r) => r.data);
+export const getSuggestions = (limit = 8) => api.get("/api/ecosystem/friends/suggestions", { params: { limit } }).then((r) => r.data);
